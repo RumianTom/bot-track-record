@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bot Track Record</title>
+<meta name="description" content="Two rule-based trading bots running on an Alpaca paper account: live results next to their backtests. Paper trading with simulated money; not investment advice.">
+<style>
+:root {
+  --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1f; --muted: #6b6b70; --line: #e4e4e0;
+  --accent: #2f6fde; --pos: #1f8a4c; --neg: #c2412d; --warn-bg: #fff6e0; --warn-line: #e8c46a;
+  --bt: #a0a0a8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141416; --card: #1d1d20; --text: #ececee; --muted: #9a9aa2; --line: #2e2e33;
+    --accent: #6b9bff; --pos: #4cc77f; --neg: #ff7a63; --warn-bg: #2b2412; --warn-line: #7a6326;
+    --bt: #6e6e78;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141416; --card: #1d1d20; --text: #ececee; --muted: #9a9aa2; --line: #2e2e33;
+  --accent: #6b9bff; --pos: #4cc77f; --neg: #ff7a63; --warn-bg: #2b2412; --warn-line: #7a6326;
+  --bt: #6e6e78;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+h2 { font-size: 20px; margin: 40px 0 12px; }
+h3 { font-size: 16px; margin: 20px 0 8px; }
+p { margin: 8px 0; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  background: var(--warn-bg); border: 1px solid var(--warn-line); margin-right: 6px; }
+.notice { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 10px; padding: 12px 14px; margin: 16px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 16px 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 12px 0; }
+.kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.kpi .v { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .l { font-size: 12px; color: var(--muted); }
+.pos { color: var(--pos); } .neg { color: var(--neg); }
+.chart { position: relative; height: 240px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.scroll { overflow-x: auto; }
+.author { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; font-size: 13px; }
+.author dt { color: var(--muted); }
+.author dd { margin: 0; }
+footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<main>
+  <span class="badge">PAPER TRADING · SIMULATED MONEY</span><span class="badge">NOT INVESTMENT ADVICE</span>
+  <h1>Bot Track Record</h1>
+  <p class="muted">Two simple, rule-based trading bots, running live on an Alpaca <strong>paper</strong> account
+    (simulated money, real market prices). Live results are shown next to what the backtest predicted,
+    so you can see whether the backtest holds up.</p>
+
+  <div class="card">
+    <dl class="author">
+      <dt>Author</dt><dd id="author">…</dd>
+      <dt>Data updated</dt><dd id="updated">…</dd>
+      <dt>Data source</dt><dd>Alpaca paper trading API (orders, positions, daily closes), read-only export</dd>
+      <dt>Conflict of interest</dt><dd>The author runs these bots; the paper account holds the positions listed
+        below. No compensation is received from any broker, exchange or issuer mentioned.</dd>
+    </dl>
+  </div>
+
+  <div class="notice small">
+    <strong>Important.</strong> Paper trading uses simulated money; real trading would face extra costs, slippage and
+    tax. Backtest figures are <strong>hypothetical</strong>. Past performance — simulated or live — is not a reliable
+    indicator of future results. Nothing on this page is a recommendation to buy or sell anything, nor advice
+    tailored to anyone's situation. Holdings are shown for transparency only.
+  </div>
+
+  <div id="bots"></div>
+
+  <h2>How the bots work</h2>
+  <div class="card">
+    <h3>🪙 Crypto — time-series momentum (BTC, ETH)</h3>
+    <p>Each coin gets half the budget. The bot holds a coin while its 30-, 60- and 90-day returns are positive
+      (each counts as one vote) and its price is above the 200-day average. Position size shrinks when volatility
+      rises (target 40% annualised volatility). Checks every 15 minutes, trades only when the target changes
+      by 10% or more. Long only, no leverage.</p>
+    <h3>📈 ETF — dual momentum (10 ETFs)</h3>
+    <p>Universe: SPY, QQQ, IWM, EFA, EEM, VNQ, TLT, IEF, GLD, DBC — US, international and emerging-market stocks,
+      real estate, bonds, gold and commodities. At each month end the bot ranks them by 9-month return and holds the
+      top 4 at 25% each, but only ETFs with a positive return that trade above their 200-day average; empty slots
+      stay in cash. Trades only during US market hours. Long only, no leverage.</p>
+    <h3>How they were tested</h3>
+    <p>Rules were chosen on older data and judged only on newer data they had not seen ("out-of-sample"), plus a
+      yearly walk-forward test, with fees and slippage included. Crypto: tuned on 2021–2024, tested on 2025–2026.
+      ETFs: tuned on 2016–2022, tested on 2023–2026. Neighbouring parameter values were checked to make sure the
+      result isn't a lucky setting. Earlier ideas that failed this test (several trend and breakout rules, an
+      LLM-driven trader, funding-rate arbitrage) were discarded.</p>
+    <h3>Risk limits</h3>
+    <p>Each bot has a fixed $1,000 budget, never buys with more than available cash, stops buying for the day after
+      losing 3% of its budget, and has an independent kill switch.</p>
+  </div>
+
+  <h2>Interested?</h2>
+  <p>If you run a trading bot and would want its live results verified side by side with its backtest like this,
+    <a href="https://github.com/RumianTom/bot-track-record/issues/new?title=Interested%20in%20verifying%20my%20bot">open an issue</a>
+    and say so. This is an experiment; nothing is for sale.</p>
+
+  <footer>
+    <p>Built with open data from Alpaca. Figures in USD. Monthly returns use calendar months; the current month is
+      partial. “Max drawdown” is the largest fall from a previous peak.</p>
+    <p id="theme-toggle-wrap"><a href="#" id="theme-toggle">Toggle light/dark</a></p>
+  </footer>
+</main>
+
+<script>
+const fmtUsd = v => "$" + v.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtPct = v => (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+const cls = v => v > 0 ? "pos" : v < 0 ? "neg" : "";
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+
+function lineChart(canvas, points, color, dashed) {
+  return new Chart(canvas, {
+    type: "line",
+    data: { labels: points.map(p => p[0]),
+            datasets: [{ data: points.map(p => p[1]), borderColor: color, borderWidth: 2, pointRadius: points.length < 40 ? 2 : 0,
+                         borderDash: dashed ? [5, 4] : [], tension: 0.15 }] },
+    options: { maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => fmtUsd(c.parsed.y) } } },
+      scales: { x: { ticks: { color: css("--muted"), maxTicksLimit: 6 }, grid: { color: css("--line") } },
+                y: { ticks: { color: css("--muted"), callback: v => "$" + v }, grid: { color: css("--line") } } } }
+  });
+}
+
+function botSection(b, bt) {
+  const el = document.createElement("section");
+  const live = b.series.length > 0;
+  el.innerHTML = `
+    <h2>${esc(b.label)} bot</h2>
+    <p class="muted small">${esc(b.strategy)}</p>
+    <div class="kpis">
+      <div class="kpi"><div class="v">${fmtUsd(b.value)}</div><div class="l">Value (started ${fmtUsd(b.start_capital)})</div></div>
+      <div class="kpi"><div class="v ${cls(b.total_return)}">${fmtPct(b.total_return)}</div><div class="l">Total return (paper)</div></div>
+      <div class="kpi"><div class="v ${cls(b.max_drawdown)}">${fmtPct(b.max_drawdown)}</div><div class="l">Max drawdown (paper)</div></div>
+      <div class="kpi"><div class="v">${b.days_live}</div><div class="l">Days live</div></div>
+      <div class="kpi"><div class="v">${b.fills.length}</div><div class="l">Trades (fills)</div></div>
+    </div>
+    <div class="card">
+      <h3>Live paper results</h3>
+      ${live ? `<div class="chart"><canvas></canvas></div>`
+             : `<p class="muted">No trades yet — the first orders are placed at the next rebalance.</p>`}
+    </div>
+    <div class="card">
+      <h3>Backtest — hypothetical, $1,000 start</h3>
+      <p class="small muted">Simulated with historical prices, fees and slippage. Out-of-sample period starts ${esc(bt.oos_start)}.
+        Hypothetical results have inherent limitations and are not a guarantee of anything.</p>
+      <div class="chart"><canvas></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Monthly returns (paper)</h3>
+      ${b.monthly.length ? `<div class="scroll"><table><tr><th>Month</th><th>Return</th></tr>
+        ${b.monthly.map(m => `<tr><td>${esc(m[0])}</td><td class="${cls(m[1])}">${fmtPct(m[1])}</td></tr>`).join("")}</table></div>`
+        : `<p class="muted">No full data yet.</p>`}
+    </div>
+    <div class="card">
+      <h3>Current holdings</h3>
+      <p class="small muted">As of ${esc(window.__updated)}. Shown for transparency, not as a recommendation.</p>
+      ${b.holdings.length ? `<div class="scroll"><table><tr><th>Symbol</th><th>Value</th><th>Since entry</th></tr>
+        ${b.holdings.map(h => `<tr><td>${esc(h.symbol)}</td><td>${fmtUsd(h.value)}</td><td class="${cls(h.return)}">${fmtPct(h.return)}</td></tr>`).join("")}</table></div>`
+        : `<p class="muted">All in cash.</p>`}
+    </div>
+    <div class="card">
+      <h3>Trade log</h3>
+      ${b.fills.length ? `<div class="scroll"><table><tr><th>Time (UTC)</th><th>Side</th><th>Symbol</th><th>Amount</th><th>Price</th></tr>
+        ${b.fills.map(f => `<tr><td>${esc(f.time)}</td><td>${esc(f.side.toUpperCase())}</td><td>${esc(f.symbol)}</td><td>${fmtUsd(f.usd)}</td><td>${fmtUsd(f.price)}</td></tr>`).join("")}</table></div>`
+        : `<p class="muted">No trades yet.</p>`}
+    </div>`;
+  document.getElementById("bots").appendChild(el);
+  const canvases = el.querySelectorAll("canvas");
+  let i = 0;
+  if (live) lineChart(canvases[i++], b.series, css("--accent"), false);
+  lineChart(canvases[i], bt.series, css("--bt"), true);
+}
+
+async function load() {
+  const [live, bt] = await Promise.all([
+    fetch("data/live.json", {cache: "no-store"}).then(r => r.json()),
+    fetch("data/backtest.json").then(r => r.json()),
+  ]);
+  window.__updated = live.updated;
+  document.getElementById("author").textContent = live.author;
+  document.getElementById("updated").textContent = live.updated;
+  live.bots.forEach(b => botSection(b, bt[b.key]));
+}
+
+document.getElementById("theme-toggle").addEventListener("click", e => {
+  e.preventDefault();
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  document.getElementById("bots").innerHTML = "";
+  load();
+});
+
+load().catch(err => {
+  document.getElementById("bots").innerHTML = `<p class="neg">Could not load data: ${esc(err.message)}</p>`;
+});
+</script>
+</body>
+</html>
